@@ -6,19 +6,20 @@ WORKDIR /src
 COPY . .
 
 # Install Bazelisk
-RUN go install github.com/bazelbuild/bazelisk@latest
+RUN go install github.com/bazelbuild/bazelisk@v1.29.0
 
 ENV PATH="/go/bin:${PATH}"
 
 # Build the application with Bazel
-RUN bazel build //cmd/server:server
+RUN bazelisk build //cmd/server:server && \
+    cp "$(bazelisk cquery --output=files //cmd/server:server)" /server
 
 # Runtime stage
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-COPY --from=builder /src/bazel-bin/cmd/server/server ./server
+COPY --from=builder /server ./server
 
 EXPOSE 8080
 
