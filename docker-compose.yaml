@@ -1,0 +1,31 @@
+services:
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+
+  gerrit:
+    image: gerritcodereview/gerrit
+    container_name: gerrit
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "29418:29418"
+    volumes:
+      - gerrit_data:/var/gerrit
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: task-app
+    restart: unless-stopped
+
+volumes:
+  jenkins_data:
+  gerrit_data:
