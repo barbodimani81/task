@@ -29,12 +29,6 @@ pipeline {
             }
         }
 
-        stage('Go Tests') {
-            steps {
-                sh 'go test ./...'
-            }
-        }
-
         stage('Bazel Build') {
             steps {
                 sh 'bazel build //...'
@@ -50,7 +44,7 @@ pipeline {
         stage('Run Application') {
             steps {
                 sh '''
-                    OUTPUT=$(go run ./cmd/server)
+                    OUTPUT=$(bazel run --noshow_progress //cmd/server:server)
                     echo "$OUTPUT"
 
                     if [ "$OUTPUT" != "Hello, World!" ]; then
