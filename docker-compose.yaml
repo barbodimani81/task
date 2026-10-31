@@ -28,7 +28,11 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: task-app
-    restart: "no"  # the binary prints and exits; unless-stopped would restart-loop it
+    restart: unless-stopped
+    ports:
+      - "8082:8080"  # host 8080 is Gerrit and 8081 is Jenkins
+    environment:
+      - APP_ENV=compose
 
 volumes:
   jenkins_data:

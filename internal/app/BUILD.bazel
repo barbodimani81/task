@@ -10,5 +10,6 @@ go_library(
 go_test(
     name = "app_test",
     srcs = ["app_test.go"],
+    size = "small",
     embed = [":app"],
 )
