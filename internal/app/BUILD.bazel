@@ -5,11 +5,13 @@ go_library(
     srcs = ["app.go"],
     importpath = "github.com/barbodimani81/task/internal/app",
     visibility = ["//visibility:public"],
+    deps = ["//internal/greetings"],
 )
 
 go_test(
     name = "app_test",
-    srcs = ["app_test.go"],
     size = "small",
+    srcs = ["app_test.go"],
     embed = [":app"],
+    deps = ["//internal/greetings"],
 )

@@ -10,7 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/barbodimani81/task/internal/app"
+	"github.com/barbodimani81/task/internal/greetings"
 )
 
 // getenv returns the environment variable key, or fallback if it is unset or empty.
@@ -26,9 +29,21 @@ func main() {
 	version := getenv("APP_VERSION", "dev")
 	env := getenv("APP_ENV", "local")
 
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+	// The pool connects lazily, so the server starts even while the database
+	// is down; /readyz reports that until it comes back.
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		log.Fatalf("parsing DATABASE_URL: %v", err)
+	}
+	defer pool.Close()
+
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: app.NewHandler(version, env),
+		Handler: app.NewHandler(version, env, greetings.NewStore(pool)),
 		// Without a header timeout, slow clients can hold connections open forever.
 		ReadHeaderTimeout: 5 * time.Second,
 	}
