@@ -15,5 +15,17 @@ COPY --from=tools /out/bazelisk /usr/local/bin/bazelisk
 RUN ln -s /usr/local/bin/bazelisk /usr/local/bin/bazel
 ENV PATH="/usr/local/go/bin:${PATH}"
 
+# Docker CLI and buildx to build and push images. The daemon is the separate
+# docker:dind service in docker-compose.yaml.
+COPY --from=docker:29-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker:29-cli /usr/local/libexec/docker/cli-plugins/docker-buildx /usr/local/libexec/docker/cli-plugins/docker-buildx
+
+# kubectl, only for `kubectl kustomize`; CI never talks to a cluster.
+ARG KUBECTL_VERSION=v1.34.1
+ARG TARGETARCH
+RUN curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl" \
+ && echo "$(curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl.sha256")  /usr/local/bin/kubectl" | sha256sum -c - \
+ && chmod +x /usr/local/bin/kubectl
+
 USER jenkins
 RUN jenkins-plugin-cli --plugins gerrit-trigger git workflow-aggregator timestamper ssh-credentials

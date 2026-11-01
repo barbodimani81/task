@@ -5,11 +5,32 @@ services:
     image: task-jenkins
     container_name: jenkins
     restart: unless-stopped
+    environment:
+      # Builds talk to the docker service below over TLS, never to the host's Docker.
+      - DOCKER_HOST=tcp://docker:2376
+      - DOCKER_CERT_PATH=/certs/client
+      - DOCKER_TLS_VERIFY=1
     ports:
       - "8081:8080"
       - "50000:50000"
     volumes:
       - jenkins_data:/var/jenkins_home
+      - docker_certs:/certs/client:ro
+    depends_on:
+      - docker
+
+  # The Docker daemon Jenkins builds images with (Docker-in-Docker). It has to be
+  # privileged, but Jenkins itself isn't, and the host's Docker stays out of CI.
+  docker:
+    image: docker:29-dind
+    container_name: jenkins-docker
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - docker_certs:/certs/client
+      - docker_data:/var/lib/docker
 
   gerrit:
     image: gerritcodereview/gerrit:3.14.5
@@ -27,3 +48,5 @@ services:
 volumes:
   jenkins_data:
   gerrit_data:
+  docker_certs:
+  docker_data:
