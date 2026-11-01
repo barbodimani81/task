@@ -32,6 +32,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: task-config
+          env:
+            - name: DB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: task-db-app
+                  key: uri
+            - name: DATABASE_URL
+              value: $(DB_URI)?sslmode=require
           readinessProbe:
             httpGet:
               path: /healthz

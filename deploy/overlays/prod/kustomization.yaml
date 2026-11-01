@@ -9,7 +9,7 @@ replicas:
     count: 3
 images:
   - name: task-app
-    newTag: 292dfa4
+    newTag: 13b4764
   - name: task-migrate
     newTag: 61364d2
 configMapGenerator:
@@ -17,4 +17,4 @@ configMapGenerator:
     behavior: merge
     literals:
       - APP_ENV=prod
-      - APP_VERSION=292dfa4
+      - APP_VERSION=13b4764
