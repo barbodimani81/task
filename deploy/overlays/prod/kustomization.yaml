@@ -10,6 +10,8 @@ replicas:
 images:
   - name: task-app
     newTag: 292dfa4
+  - name: task-migrate
+    newTag: 61364d2
 configMapGenerator:
   - name: task-config
     behavior: merge
