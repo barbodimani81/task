@@ -4,6 +4,8 @@ go_binary(
     name = "server",
     embed = [":server_lib"],
     importpath = "github.com/barbodimani81/task/cmd/server",
+    # No cgo, so the binary is static and runs on distroless/static, which has no libc.
+    pure = "on",
     visibility = ["//visibility:public"],
 )
 
