@@ -27,5 +27,10 @@ RUN curl -fsSLo /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERS
  && echo "$(curl -fsSL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${TARGETARCH}/kubectl.sha256")  /usr/local/bin/kubectl" | sha256sum -c - \
  && chmod +x /usr/local/bin/kubectl
 
+# Trivy finds known vulnerabilities in images; cosign signs them. Both are single static
+# binaries, copied out of their makers' pinned images.
+COPY --from=aquasec/trivy:0.76.1 /usr/local/bin/trivy /usr/local/bin/trivy
+COPY --from=ghcr.io/sigstore/cosign/cosign:v2.6.5 /ko-app/cosign /usr/local/bin/cosign
+
 USER jenkins
 RUN jenkins-plugin-cli --plugins gerrit-trigger git workflow-aggregator timestamper ssh-credentials

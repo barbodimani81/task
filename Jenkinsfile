@@ -80,7 +80,11 @@ pipeline {
             // Only task-postsubmit (main moved) publishes; unreviewed patch sets never push.
             when { environment name: 'GERRIT_EVENT_TYPE', value: 'ref-updated' }
             steps {
-                withCredentials([usernamePassword(credentialsId: 'ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN')]) {
+                withCredentials([
+                    usernamePassword(credentialsId: 'ghcr', usernameVariable: 'GHCR_USER', passwordVariable: 'GHCR_TOKEN'),
+                    file(credentialsId: 'cosign-key', variable: 'COSIGN_KEY'),              // path to a temporary copy of cosign.key
+                    string(credentialsId: 'cosign-password', variable: 'COSIGN_PASSWORD')   // cosign reads this variable by itself
+                ]) {
                     sh '''
                         # One immutable tag per commit, shared by both images. Never :latest.
                         TAG=$(git rev-parse --short=7 HEAD)
@@ -94,6 +98,13 @@ pipeline {
                         docker build $LABELS --build-arg VERSION="$TAG" -t "$REGISTRY/task-app:$TAG" .
                         docker build $LABELS -t "$REGISTRY/task-migrate:$TAG" migrations
 
+                        # Gate: stop before anything is pushed if an image has a HIGH or CRITICAL
+                        # vulnerability that already has a fix. Ones with no fix yet are skipped.
+                        for img in task-app task-migrate; do
+                            trivy image --image-src docker --quiet --scanners vuln \
+                                --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$REGISTRY/$img:$TAG"
+                        done
+
                         # GHCR sometimes refuses the manifest after a slow upload. The layers are
                         # already there by then, so a second try succeeds.
                         push_with_retry() {
@@ -104,12 +115,19 @@ pipeline {
                             done
                             return 1
                         }
-                        push_with_retry "$REGISTRY/task-app:$TAG"
-                        push_with_retry "$REGISTRY/task-migrate:$TAG"
+                        for img in task-app task-migrate; do
+                            push_with_retry "$REGISTRY/$img:$TAG"
+                            # Sign the digest (the hash of the image's content), not the tag: a tag can later
+                            # point at another image, a digest can't. --tlog-upload=false keeps the signature
+                            # out of the public Rekor log.
+                            cosign sign --yes --key "$COSIGN_KEY" --tlog-upload=false \
+                                "$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$img:$TAG")"
+                        done
                     '''
                 }
             }
         }
+
         stage('Promote to Dev') {
             // Every merge on main goes to dev by itself. Prod moves only through a change a human approves.
             when { environment name: 'GERRIT_EVENT_TYPE', value: 'ref-updated' }
@@ -126,7 +144,7 @@ pipeline {
                         chmod +x "$CONFIG/.git/hooks/commit-msg"
 
                         DEV="$CONFIG/overlays/dev/kustomization.yaml"
-                        CURRENT=$(awk '/newTag:/ {print $2; exit}' "$DEV")
+                        CURRENT=$(awk '/newTag:/ {print $2; exit}' "$DEV" | tr -d "'")
                         if [ "$CURRENT" = "$TAG" ]; then
                             echo "Dev already runs $TAG."
                             exit 0
@@ -137,7 +155,8 @@ pipeline {
                             exit 0
                         fi
 
-                        sed -i "s/newTag: .*/newTag: $TAG/" "$DEV"
+                        # Quoted, or YAML reads an all-digit commit like 6795373 as a number.
+                        sed -i "s/newTag: .*/newTag: '$TAG'/" "$DEV"
                         kubectl kustomize "$CONFIG/overlays/dev" > /dev/null
 
                         cd "$CONFIG"
