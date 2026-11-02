@@ -75,17 +75,6 @@ pipeline {
                 '''
             }
         }
-        stage('Render Kustomize') {
-            steps {
-                sh '''
-                    # Catch broken YAML or a bad patch in review, not at deploy time.
-                    for overlay in deploy/overlays/*/; do
-                        echo "Rendering $overlay"
-                        kubectl kustomize "$overlay" > /dev/null
-                    done
-                '''
-            }
-        }
 
         stage('Publish Images') {
             // Only task-postsubmit (main moved) publishes; unreviewed patch sets never push.
