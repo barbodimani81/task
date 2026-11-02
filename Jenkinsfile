@@ -143,8 +143,16 @@ pipeline {
                         cd "$CONFIG"
                         git -c user.name='Jenkins CI' -c user.email='jenkins@ci.local' \
                             commit -qam "dev: run $TAG" -m "Automatic: task commit $TAG landed on main."
-                        # Vote and submit in one push. Gerrit still applies every rule, so this only works for dev.
-                        git push -o l=Code-Review+2 -o l=Verified+1 -o submit origin HEAD:refs/for/main
+                        git push origin HEAD:refs/for/main
+                        # A normal submit, so Gerrit checks every submit requirement: a bump that touched
+                        # prod would stop at Prod-Approval. (Submitting during the push would skip them all.)
+                        COMMIT=$(git rev-parse HEAD)
+                        if ! ssh -p 29418 jenkins@gerrit gerrit review --project task-config \
+                                --code-review +2 --verified +1 --submit "$COMMIT"; then
+                            # Don't leave a stale change behind. The retry starts over with a new one.
+                            ssh -p 29418 jenkins@gerrit gerrit review --project task-config --abandon "$COMMIT"
+                            exit 1
+                        fi
                     '''
                 }
             }
